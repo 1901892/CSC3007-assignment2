@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+    <html>
+        <head>
+            <title>SG Crime Info</title>
+
+            <!-- Viewport for responsive web design -->
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+
+            <!-- Jquery import -->
+            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+            <!-- D3.js import --> 
+            <script src="https://d3js.org/d3.v7.min.js"></script>
+
+            <!-- CSS Bootstrap import -->
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+            <!-- CSS Google fonts import -->
+            <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+        
+            <!-- CSS style sheet -->
+            <style>
+                body {
+                    background-image: url("https://static.vecteezy.com/system/resources/previews/003/136/978/non_2x/colourful-window-shutters-of-the-old-building-free-photo.jpg");
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    background-attachment: fixed;
+                    background-size: cover;
+                }
+                h1 {
+                    color: lightskyblue;
+                    font-size: 50px;
+                    text-align: center;
+                    font-family: 'Roboto', sans-serif;
+                }
+                .header {
+                    background: black;
+                    opacity: 85%;
+                }
+                .container {
+                    background: white;
+                    opacity: 95%;
+                    padding: 5px;
+                }
+                .yearChartSvgRect {
+                    stroke: none;
+                    fill: steelblue;
+                }
+                .offenceChartSvgRect {
+                    stroke: none;
+                    fill: indianred;
+                }
+            </style>
+        </head>
+
+    <body>
+        <div class="header">
+            <h1>Singapore Crime Information</h1>
+        </div>
+
+        <div class="container text-center">
+            <h5>Crime statistics from the Singapore Police Force, sorted by year and major offence type</h5>
+            <div class="container text-center">
+                <label>Year:</label>
+                <select id="selectYear"></select>
+            </div>
+            <svg id="yearChart" viewBox="0 0 1200 500"></svg>
+            <div class="container text-center">
+                <label>Offence:</label>
+                <select id="selectOffence"></select>
+            </div>
+            <svg id="offenceChart" viewBox="0 0 1200 500"></svg>
+            <script>
+                $.ajax({
+                    url:'https://data.gov.sg/api/action/datastore_search?resource_id=83c21090-bd19-4b54-ab6b-d999c251edcf',
+                    success: function(data) {
+                        //Retrieve API data
+                        let records = data.result.records
+                        //console.log(records)
+
+                        //Obtain keys information from records
+                        let keys = Object.keys(records)
+                        //console.log(keys)
+
+                        //Obtain years information and sort by latest year
+                        let years = new Set(records.map(d => d.year).reverse())
+                        //console.log(years)
+
+                        //Obtain offence types
+                        let offences = new Set(records.map(d => d.level_2))
+                        //console.log(offences)
+
+                        //Display all available years for for dropdown box
+                        d3.select("#selectYear")
+                            .selectAll('yearOptions')
+                            .data(years)
+                            .enter()
+                            .append('option')
+                            .text(function(d) { return d; })
+                            .attr("value", function (d) { return d; })                      
+
+                        //Display all available offences for dropdown box
+                        d3.select("#selectOffence")
+                            .selectAll('offenceOptions')
+                            .data(offences)
+                            .enter()
+                            .append('option')
+                            .text(function(d) { return d; })
+                            .attr("value", function (d) { return d; })
+                        
+                        //Dimensions for the charts
+                        let margin = { top: 20, right: 20, bottom: 40, left: 40 },
+                            width = 1200 - margin.left - margin.right,
+                            height = 500 - margin.top - margin.bottom;
+                        
+                        //Add year chart
+                        let yearChart = d3.select("#yearChart")
+                            .append("g")
+                            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+
+                        //Add offence chart
+                        let offenceChart = d3.select("#offenceChart")
+                            .append("g")
+                            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+
+                        //Add scales for year chart
+                        let yearChartXScale = d3.scaleBand()
+                            .domain(records.map(function(d) { return d.level_2; }))
+                            .rangeRound([0, width])
+                            .padding(0.1)
+                        let yearChartYScale = d3.scaleLinear()
+                            .domain([0, d3.max(offences, function(d) { return +d.value; })])
+                            .rangeRound([height, 0])
+
+                        //Add scales for offence chart
+                        let offenceChartXScale = d3.scaleBand()
+                            .domain(records.map(function(d) { return d.year; }))
+                            .rangeRound([0, width])
+                            .padding(0.1)
+                        let offenceChartYScale = d3.scaleLinear()
+                            .domain([0, d3.max(offences, function(d) { return +d.value; })])
+                            .rangeRound([height, 0])
+
+                        //Add x-axis for year chart
+                        yearChart.append("g")
+                            .attr("class", "axis axis-x")
+                            .attr("transform", "translate(0," + height + ")")
+                            .call(d3.axisBottom(yearChartXScale))
+                        //Add y-axis for year chart
+                        yearChart.append("g")
+                            .attr("class", "axis axis-y")
+                            .call(d3.axisLeft(yearChartYScale).ticks(10))
+
+                        //Add x-axis for offence chart
+                        offenceChart.append("g")
+                            .attr("class", "axis axis-x")
+                            .attr("transform", "translate(0," + height + ")")
+                            .call(d3.axisBottom(offenceChartXScale))
+                        //Add y-axis for offence chart
+                        offenceChart.append("g")
+                            .attr("class", "axis axis-y")
+                            .call(d3.axisLeft(offenceChartYScale).ticks(10))
+
+                        //Add tooltip
+                        var tooltip = d3.select("body")
+                            .append("div")
+                            .attr('class', 'd3-tooltip')
+                            .style('position', 'absolute')
+                            .style('visibility', 'hidden')
+                            .style('padding', '10px')
+                            .style('border-radius', '10px')
+                            .style('color', 'white')
+                            .style('background', 'rgba(0,0,0,0.8)')
+                            .style('pointer-events', 'none')
+
+                        //Function to draw year chart
+                        function drawYearChart(selectedYear) {
+                            //Obtain all offence information for the selected year
+                            let offenceInfo = []
+                            for (var i = 0; i < keys.length; i++) {
+                                if (records[keys[i]].year == selectedYear) {
+                                    offenceInfo.push(records[keys[i]])
+                                }
+                            }
+                            //console.log(offenceInfo)
+
+                            //Change xScale domain based on dataset
+                            yearChartXScale.domain(records.map(function(d) { return d.level_2; }))
+                            yearChart.select("g .axis-x")
+                                .transition()
+                                .duration(1000)
+                                .call(d3.axisBottom(yearChartXScale))
+                            //Change yScale domain based on dataset
+                            yearChartYScale.domain([0, d3.max(offenceInfo, function(d) { return +d.value; })])
+                                .rangeRound([height, 0])
+                            yearChart.select("g .axis-y")
+                                .transition()
+                                .duration(1000)
+                                .call(d3.axisLeft(yearChartYScale).ticks(10))
+                            
+                            yearChart.selectAll("rect")
+                                .data(offenceInfo)
+                                .join(
+                                enter => enter
+                                    .append("rect")
+                                    .attr("x", d => yearChartXScale(d.level_2))
+                                    .attr("y", d => yearChartYScale(d.value))
+                                    .attr("width", 0)
+                                    .attr("height", 0)
+                                    .attr("class", "yearChartSvgRect")
+                                    .on('mouseover', function(event, d) {
+                                        tooltip
+                                            .html('Cases: ' + d.value)
+                                            .style('visibility', 'visible')
+                                    })
+                                    .on('mousemove', function(event, d) {
+                                        tooltip
+                                            .style('left', event.pageX + 'px')
+                                            .style('top', event.pageY + 'px')
+                                    })
+                                    .on('mouseout', function(d) {
+                                        tooltip
+                                            .style('visibility', 'hidden')
+                                    })
+                                .call(enter => enter.transition()
+                                    .duration(1000)
+                                    .attr("width", yearChartXScale.bandwidth())
+                                    .attr("height", d => height - yearChartYScale(d.value))
+                                    ),
+                                update => update 
+                                .call(update => update.transition()
+                                    .duration(1000)
+                                    .attr("x", d => yearChartXScale(d.level_2))
+                                    .attr("y", d => yearChartYScale(d.value))
+                                    .attr("width", yearChartXScale.bandwidth())
+                                    .attr("height", d => height - yearChartYScale(d.value))
+                                    ),
+                                exit => exit
+                                .call(exit => exit.transition()
+                                    .duration(1000)
+                                    .attr("width", 0)
+                                    .attr("height", 0)
+                                    .remove()
+                                    )
+                                )
+                            }
+
+                        //Function to draw offence chart
+                        function drawOffenceChart(selectedOffence) {
+                            //Obtain all offence information for the selected offence
+                            let offenceInfo = []
+                            for (var i = 0; i < keys.length; i++) {
+                                if (records[keys[i]].level_2 == selectedOffence) {
+                                    offenceInfo.push(records[keys[i]])
+                                }
+                            }
+                            //console.log(offenceInfo)
+                            
+                            //Change xScale domain based on dataset
+                            offenceChartXScale.domain(records.map(function(d) { return d.year; }))
+                            offenceChart.select("g .axis-x")
+                                .transition()
+                                .duration(1000)
+                                .call(d3.axisBottom(offenceChartXScale))
+
+                            //Change yScale domain based on dataset
+                            offenceChartYScale.domain([0, d3.max(offenceInfo, function(d) { return +d.value; })])
+                                .rangeRound([height, 0])
+                            offenceChart.select("g .axis-y")
+                                .transition()
+                                .duration(1000)
+                                .call(d3.axisLeft(offenceChartYScale).ticks(10))
+                            
+                            offenceChart.selectAll("rect")
+                                .data(offenceInfo)
+                                .join(
+                                enter => enter
+                                    .append("rect")
+                                    .attr("x", d => offenceChartXScale(d.year))
+                                    .attr("y", d => offenceChartYScale(d.value))
+                                    .attr("width", 0)
+                                    .attr("height", 0)
+                                    .attr("class", "offenceChartSvgRect")
+                                    .on('mouseover', function(event, d) {
+                                        tooltip
+                                            .html('Cases: ' + d.value)
+                                            .style('visibility', 'visible')
+                                    })
+                                    .on('mousemove', function(event, d) {
+                                        tooltip
+                                            .style('left', event.pageX + 'px')
+                                            .style('top', event.pageY + 'px')
+                                    })
+                                    .on('mouseout', function(d) {
+                                        tooltip
+                                            .style('visibility', 'hidden')
+                                    })
+                                .call(enter => enter.transition()
+                                    .duration(1000)
+                                    .attr("width", offenceChartXScale.bandwidth())
+                                    .attr("height", d => height - offenceChartYScale(d.value))
+                                    ),
+                                update => update 
+                                .call(update => update.transition()
+                                    .duration(1000)
+                                    .attr("x", d => offenceChartXScale(d.year))
+                                    .attr("y", d => offenceChartYScale(d.value))
+                                    .attr("width", offenceChartXScale.bandwidth())
+                                    .attr("height", d => height - offenceChartYScale(d.value))
+                                    ),
+                                exit => exit
+                                .call(exit => exit.transition()
+                                    .duration(1000)
+                                    .attr("width", 0)
+                                    .attr("height", 0)
+                                    .remove()
+                                    )
+                                )
+                            }
+                        //Obtain user selection and call function to draw the year chart
+                        d3.select("#selectYear").on("change", function(d) {
+                            var selected = d3.select(this).property("value")
+                            drawYearChart(selected)
+                        })
+                        //Obtain user selection and call function to draw the offence chart
+                        d3.select("#selectOffence").on("change", function(d) {
+                            var selected = d3.select(this).property("value")
+                            drawOffenceChart(selected)
+                        })
+                        //Default charts to draw when page is loaded, matching with the first option of the dropdown boxes
+                        drawYearChart([... years][0])
+                        drawOffenceChart([... offences][0])
+                    }
+                });
+            </script>
+        </div>
+    </body>
+</html>
